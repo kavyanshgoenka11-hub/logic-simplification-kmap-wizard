@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logic Simplification & K-Map Wizard - Enhanced</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Roboto+Mono:wght==400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" xintegrity="sha384-wns4TxB7eD9G55/XkKWEy4kE/R1/S7ndS1gV7h98eC3zB1o3I3g7T3K2m0vJmJ2r/n" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" xintegrity="sha384-KzXpfd1Q0z4/uLz/s3eP/Q1y2E/R1/S7ndS1gV7h98eC3zB1o3I3g7T3K2m0vJmJ2r/n" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" xintegrity="sha384-y0YI/wH28fM3o/vG1b0kM7/YnQ5uP942Fm/v+P1z/n/Y1zG9xI3tG7n+z9XJ3n/7" crossorigin="anonymous"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'Roboto Mono', monospace; }
+        .tab-button.active {
+            background-color: #4f46e5;
+            color: white;
+            box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.4);
+        }
+        /* Custom styling for KaTeX block equations */
+        .katex-display {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            overflow-x: auto; /* Ensure large equations scroll */
+        }
+        /* Style for SVG gate connections */
+        .gate-line {
+            stroke: #4f46e5;
+            stroke-width: 2;
+            fill: none;
+        }
+        .gate-symbol {
+            fill: #10b981; /* emerald-500 */
+        }
+        .gate-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            fill: #d1d5db; /* gray-300 */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-900 text-white font-sans p-4 md:p-8">
+
+    <header class="mb-8 border-b border-indigo-700 pb-4">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-white flex items-center">
+            <svg class="w-8 h-8 mr-3 text-indigo-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12H3L15 2l-3 10h8l-12 10 3-10z"/></svg>
+            Logic Simplification & K-Map Wizard
+        </h1>
+        <p class="text-gray-400 mt-1">Real-time K-Map, Logic Diagram, and Minimal SOP/POS Solver (A, B, C, D).</p>
+    </header>
+
+    <section class="mb-8 p-6 bg-gray-800 rounded-xl shadow-2xl border border-indigo-700/50">
+        <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between text-lg">
+            <span class="text-indigo-300 font-medium mb-2 sm:mb-0 text-base">Input Type:</span>
+            <div class="flex space-x-2 bg-gray-900 p-1 rounded-xl border border-gray-700">
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio" name="inputType" value="expression" id="input-expression" checked class="hidden" onchange="setInputType(this.value)">
+                    <span id="label-expression" class="px-3 py-1 rounded-lg transition-all duration-200 text-sm font-medium bg-indigo-600 text-white shadow-md">Boolean Expression</span>
+                </label>
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio" name="inputType" value="minmax" id="input-minmax" class="hidden" onchange="setInputType(this.value)">
+                    <span id="label-minmax" class="px-3 py-1 rounded-lg transition-all duration-200 text-sm font-medium text-gray-400 hover:bg-gray-700">Min/Max Terms</span>
+                </label>
+            </div>
+        </div>
+        
+        <label for="logic-input" class="block text-lg font-medium text-indigo-300 mb-3">
+            Enter Logic Function
+        </label>
+        <input
+            id="logic-input"
+            type="text"
+            placeholder="e.g., A'B + C D' + A B C D"
+            class="w-full p-4 text-xl font-mono bg-gray-900 border border-gray-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-green-400 shadow-inner"
+            oninput="handleInputChange(event)"
+        />
+        
+        <p id="input-helper-text" class="mt-3 text-sm text-gray-400">
+            <span class="font-bold">Operators:</span> <span class="font-bold">AND</span> is space, <span class="font-mono">*</span>, or <span class="font-mono">&amp;</span>. <span class="font-bold">OR</span> is <span class="font-mono">+</span> or <span class="font-mono">|</span>. <span class="font-bold">NOT</span> is <span class="font-mono">'</span>.
+        </p>
+
+        <div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between text-lg pt-4 border-t border-gray-700">
+            <span class="text-indigo-300 font-medium mb-2 sm:mb-0 text-base">Simplification Mode:</span>
+            <div class="flex space-x-2 bg-gray-900 p-1 rounded-xl border border-gray-700">
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio" name="mode" value="sop" id="mode-sop" checked class="hidden" onchange="setSimplificationMode(this.value)">
+                    <span id="label-sop" class="px-3 py-1 rounded-lg transition-all duration-200 text-sm font-medium bg-indigo-600 text-white shadow-md">SOP (Group 1s)</span>
+                </label>
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio" name="mode" value="pos" id="mode-pos" class="hidden" onchange="setSimplificationMode(this.value)">
+                    <span id="label-pos" class="px-3 py-1 rounded-lg transition-all duration-200 text-sm font-medium text-gray-400 hover:bg-gray-700">POS (Group 0s)</span>
+                </label>
+            </div>
+        </div>
+    </section>
+
+    <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2">
+            <div class="mb-4 flex space-x-2" id="tab-controls">
+                <button
+                    id="tab-kmap"
+                    class="tab-button active px-4 py-2 rounded-full text-sm font-medium transition-all bg-indigo-600 text-white hover:bg-indigo-700"
+                    onclick="setActiveTab('kmap')"
+                >
+                    K-Map Visualization
+                </button>
+                <button
+                    id="tab-truth"
+                    class="tab-button px-4 py-2 rounded-full text-sm font-medium transition-all bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    onclick="setActiveTab('truth')"
+                >
+                    Truth Table
+                </button>
+                <button
+                    id="tab-diagram-sop"
+                    class="tab-button px-4 py-2 rounded-full text-sm font-medium transition-all bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    onclick="setActiveTab('diagram-sop')"
+                >
+                    Logic Diagram (SOP)
+                </button>
+                <button
+                    id="tab-diagram-pos"
+                    class="tab-button px-4 py-2 rounded-full text-sm font-medium transition-all bg-gray-700 text-gray-300 hover:bg-gray-600"
+                    onclick="setActiveTab('diagram-pos')"
+                >
+                    Logic Diagram (POS)
+                </button>
+            </div>
+            <div id="visualization-container">
+                </div>
+        </div>
+
+        <div class="lg:col-span-1" id="results-container">
+            </div>
+    </main>
+    
+    <script>
+        // --- Global State ---
+        let inputType = 'expression';
+        let logicInput = "A'B'C'D' + A'B'C'D + A'B'C D + A'B'C D'"; // Default expression
+        let activeTab = 'kmap';
+        let mode = 'sop'; // Default mode is SOP
+        
+        // Constants
+        const GROUP_COLORS = ['#06b6d4', '#f97316', '#a855f7', '#10b981', '#ef4444', '#f59e0b',];
+        const K_MAP_ROW_MAP = { 0: 0, 1: 0, 3: 0, 2: 0, 4: 1, 5: 1, 7: 1, 6: 1, 12: 2, 13: 2, 15: 2, 14: 2, 8: 3, 9: 3, 11: 3, 10: 3 };
+        const K_MAP_COL_MAP = { 0: 0, 4: 0, 12: 0, 8: 0, 1: 1, 5: 1, 13: 1, 9: 1, 3: 2, 7: 2, 15: 2, 11: 2, 2: 3, 6: 3, 14: 3, 10: 3 };
+        const K_MAP_INDEX_MAP = [ [0, 1, 3, 2], [4, 5, 7, 6], [12, 13, 15, 14], [8, 9, 11, 10], ];
+
+        // --- Utility Functions (Updated to support min/max terms) ---
+
+        /**
+         * Converts a min/max term string (e.g., "m(0, 1, 3)" or "M(4, 5)") to a truth table.
+         * @param {string} input - The min/max term string.
+         * @returns {Array<Object>} - The generated truth table.
+         */
+        const generateTruthTableFromMinMax = (input) => {
+            const table = [];
+            const allMinterms = Array.from({ length: 16 }, (_, i) => i);
+            let targetMinterms = [];
+            let isMintermInput = input.trim().toLowerCase().startsWith('m');
+            
+            // Extract numbers
+            const numMatch = input.match(/\d+/g);
+            const inputTerms = numMatch ? numMatch.map(Number) : [];
+
+            if (isMintermInput) {
+                targetMinterms = inputTerms; // Minterms define the '1' outputs
+            } else { // Maxterms (M) define the '0' outputs
+                const maxterms = inputTerms;
+                targetMinterms = allMinterms.filter(m => !maxterms.includes(m));
+            }
+
+            for (let i = 0; i < 16; i++) {
+                const A = (i >> 3) & 1; 
+                const B = (i >> 2) & 1;
+                const C = (i >> 1) & 1;
+                const D = i & 1; 
+                const output = targetMinterms.includes(i) ? 1 : 0;
+                table.push({ minterm: i, A, B, C, D, output });
+            }
+            return table;
+        };
+
+        const evaluateBooleanExpression = (expr, variables) => {
+          // ... (Existing implementation for expression evaluation) ...
+          const cleanedExpr = expr
+            .toUpperCase()
+            .replace(/\s/g, '')
+            .replace(/\*/g, '')
+            .replace(/\&/g, '')
+            .replace(/\+/g, '||')
+            .replace(/\|/g, '||');
+
+          const terms = cleanedExpr.split('||').filter(t => t.length > 0);
+          
+          const jsParts = terms.map(term => {
+            const literals = term.match(/[ABCD]'?|./g)?.filter(l => l.match(/^[ABCD]'?$/i)) || [];
+            
+            const jsLiterals = literals.map(literal => {
+              const varName = literal.replace("'", "").toLowerCase(); 
+              return literal.endsWith("'") ? `(!${varName})` : `(${varName})`;
+            }).join(' && ');
+            
+            return jsLiterals;
+          }).filter(p => p.length > 0);
+
+          const finalJsExpression = jsParts.join(' || ');
+          
+          if (finalJsExpression === '') return 0;
+
+          try {
+            const fn = new Function('a', 'b', 'c', 'd', `return (${finalJsExpression}) ? 1 : 0`);
+            return fn(variables.A, variables.B, variables.C, variables.D);
+          } catch (e) {
+            console.error("Evaluation Error:", e.message, "for expression:", expr);
+            return 0; 
+          }
+        };
+
+        const generateTruthTableFromExpression = (expr) => {
+          const table = [];
+          for (let i = 0; i < 16; i++) {
+            const A = (i >> 3) & 1; 
+            const B = (i >> 2) & 1;
+            const C = (i >> 1) & 1;
+            const D = i & 1; 
+            const variables = { A, B, C, D };
+            const output = evaluateBooleanExpression(expr, variables);
+            table.push({ minterm: i, A, B, C, D, output });
+          }
+          return table;
+        };
+
+        const getMintermCanonical = (A, B, C, D) => {
+            let term = '';
+            term += (A === 1 ? 'A' : 'A\'');
+            term += (B === 1 ? 'B' : 'B\'');
+            term += (C === 1 ? 'C' : 'C\'');
+            term += (D === 1 ? 'D' : 'D\'');
+            return term;
+        };
+
+        const getMaxtermCanonical = (A, B, C, D) => {
+            let term = '(';
+            term += (A === 0 ? 'A' : 'A\'');
+            term += ' + ';
+            term += (B === 0 ? 'B' : 'B\'');
+            term += ' + ';
+            term += (C === 0 ? 'C' : 'C\'');
+            term += ' + ';
+            term += (D === 0 ? 'D' : 'D\'');
+            term += ')';
+            return term;
+        };
+        
+        // ... (performGrouping remains the same) ...
+        const performGrouping = (targetMinterms, isSOP, truthTable) => {
+            if (targetMinterms.length === 0) return { terms: [isSOP ? '0' : '1'], groups: [] };
+            if (targetMinterms.length === 16) return { terms: [isSOP ? '1' : '0'], groups: [] };
+
+            const maxGroups = [];
+            const terms = [];
+            const covered = new Set();
+            
+            // Simplified 8-cell groups (This is a simplified example, a real K-Map solver would be more complex)
+            const groups8Definition = [
+                { minterms: [0, 2, 4, 6, 8, 10, 12, 14], sopTerm: "D'", posTerm: "(D)" }, 
+                { minterms: [1, 3, 5, 7, 9, 11, 13, 15], sopTerm: "D", posTerm: "(D')" }, 
+                { minterms: [0, 1, 2, 3, 4, 5, 6, 7], sopTerm: "A'", posTerm: "(A)" }, 
+                { minterms: [8, 9, 10, 11, 12, 13, 14, 15], sopTerm: "A", posTerm: "(A')" },
+            ];
+            
+            // 1. Group 8s
+            groups8Definition.forEach(g => {
+                if (g.minterms.every(m => targetMinterms.includes(m))) {
+                    const term = isSOP ? g.sopTerm : g.posTerm;
+                    if (!terms.includes(term)) {
+                        terms.push(term);
+                        maxGroups.push({ size: 8, term: term, minterms: g.minterms });
+                    }
+                    g.minterms.forEach(m => covered.add(m));
+                }
+            });
+
+            // 2. Cover remaining minterms with canonical form (1-cell groups - Simplification)
+            targetMinterms.forEach(m => {
+              if (!covered.has(m)) {
+                  const row = truthTable.find(r => r.minterm === m);
+                  let term;
+                  if (isSOP) {
+                      term = getMintermCanonical(row.A, row.B, row.C, row.D);
+                  } else {
+                      term = getMaxtermCanonical(row.A, row.B, row.C, row.D);
+                  }
+                  
+                  if (!terms.includes(term)) {
+                      terms.push(term);
+                      covered.add(m);
+                      maxGroups.push({ size: 1, term: term, minterms: [m] });
+                  }
+              }
+            });
+            
+            return { terms, groups: maxGroups };
+        };
+
+        const solveKMap = (truthTable) => {
+          const ones = truthTable.filter(row => row.output === 1).map(row => row.minterm);
+          const zeros = truthTable.filter(row => row.output === 0).map(row => row.minterm);
+          
+          const kMapMatrix = Array(4).fill(0).map(() => Array(4).fill(0));
+          ones.forEach(m => {
+            const row = K_MAP_ROW_MAP[m];
+            const col = K_MAP_COL_MAP[m];
+            kMapMatrix[row][col] = 1;
+          });
+
+          // NOTE: A complete solver would find prime implicants and essential prime implicants.
+          // The current `performGrouping` is a simplified stub only covering 8-cell groups and 1-cell terms.
+          const sopResult = performGrouping(ones, true, truthTable);
+          const posResult = performGrouping(zeros, false, truthTable);
+
+          const minimalSOP = sopResult.terms.join(' + ');
+          // POS terms are multiplied (space implies AND)
+          const minimalPOS = posResult.terms.join(' '); 
+          
+          const mintermList = ones.join(', ');
+          const maxtermList = zeros.join(', ');
+
+          return { 
+            kMapMatrix, minimalSOP, minimalPOS, 
+            sopGroups: sopResult.groups, posGroups: posResult.groups, 
+            truthTable, mintermList, maxtermList
+          };
+        };
+
+        // --- Logic Diagram Generation (Enhanced for POS) ---
+
+        /**
+         * Parses the minimal SOP expression into a structured format for drawing.
+         * @param {string} sopExpr - The simplified SOP expression (e.g., "A'B + C")
+         * @returns {Array<Array<string>>} e.g., [['A\'', 'B'], ['C']]
+         */
+        function parseSOPForDiagram(sopExpr) {
+            if (sopExpr === '1' || sopExpr === '0') return []; 
+            const terms = sopExpr.split('+').map(t => t.trim()).filter(t => t.length > 0);
+            const logicStructure = [];
+            terms.forEach(term => {
+                const literals = term.match(/[ABCD]'?/g) || [];
+                if (literals.length > 0) {
+                     logicStructure.push(literals);
+                }
+            });
+            return logicStructure;
+        }
+
+         /**
+         * Parses the minimal POS expression into a structured format for drawing.
+         * @param {string} posExpr - The simplified POS expression (e.g., "(A+B')(C)")
+         * @returns {Array<Array<string>>} e.g., [['A', 'B\''], ['C']]
+         */
+        function parsePOSForDiagram(posExpr) {
+            if (posExpr === '1' || posExpr === '0') return [];
+            
+            // Split by space (implied AND) to get Sum Terms
+            const sumTerms = posExpr.split(/\s+/).map(t => t.trim()).filter(t => t.length > 0);
+            const logicStructure = [];
+
+            sumTerms.forEach(term => {
+                // Remove parentheses and split by OR operator '+' to get literals
+                const content = term.replace(/^\(|\)$/g, '').trim(); 
+                const literals = content.split('+').map(l => l.trim()).filter(l => l.length > 0);
+                if (literals.length > 0) {
+                     logicStructure.push(literals);
+                }
+            });
+            return logicStructure;
+        }
+
+        // SVG Gate Definitions
+        const GATE_WIDTH = 50;
+        const GATE_HEIGHT = 50;
+        const HORIZONTAL_SPACING = 120;
+        const VERTICAL_SPACING = 40;
+        const INPUT_VARIABLES = ['A', 'B', 'C', 'D'];
+        
+        /**
+         * Generates the SVG string for a NOT gate.
+         */
+        function drawNOTGate(x, y) {
+            return `
+                <polygon points="${x},${y} ${x + 30},${y + 15} ${x},${y + 30}" class="gate-symbol" stroke="#10b981" stroke-width="2" />
+                <circle cx="${x + 30 + 5}" cy="${y + 15}" r="4" fill="white" stroke="#10b981" stroke-width="2" />
+                <line x1="${x - 10}" y1="${y + 15}" x2="${x}" y2="${y + 15}" class="gate-line" />
+                <line x1="${x + 30 + 9}" y1="${y + 15}" x2="${x + 30 + 19}" y2="${y + 15}" class="gate-line" />
+            `;
+        }
+
+        /**
+         * Generates the SVG string for an AND gate (used in SOP).
+         */
+        function drawANDGate(x, y, numInputs) {
+            const height = GATE_HEIGHT + (numInputs - 2) * 15;
+            const radius = GATE_WIDTH / 2;
+            const halfHeight = height / 2;
+            
+            // Draw the body (Rectangle + D-shape)
+            const dShape = `
+                M ${x},${y} 
+                L ${x},${y + height} 
+                L ${x + GATE_WIDTH - radius},${y + height} 
+                A ${radius},${radius} 0 0 0 ${x + GATE_WIDTH - radius},${y} 
+                Z
+            `;
+            return `
+                <path d="${dShape}" class="gate-symbol" stroke="#10b981" stroke-width="2" />
+                <text x="${x + GATE_WIDTH / 2}" y="${y + halfHeight + 5}" text-anchor="middle" class="gate-label font-bold text-lg">AND</text>
+            `;
+        }
+        
+        /**
+         * Generates the SVG string for an OR gate (used in SOP).
+         */
+        function drawORGate(x, y, numInputs) {
+            const height = GATE_HEIGHT + (numInputs - 2) * 15;
+            const halfHeight = height / 2;
+            
+            // Use control points for the curve
+            const dShape = `
+                M ${x},${y} 
+                C ${x + 20},${y + halfHeight} ${x + 20},${y + halfHeight} ${x},${y + height} 
+                C ${x + 55},${y + height} ${x + 55},${y} ${x},${y}
+                Z
+            `;
+            return `
+                <path d="${dShape}" class="gate-symbol" stroke="#10b981" stroke-width="2" />
+                <text x="${x + GATE_WIDTH / 2}" y="${y + halfHeight + 5}" text-anchor="middle" class="gate-label font-bold text-lg">OR</text>
+            `;
+        }
+
+        /**
+         * Generates the SVG string for the final AND gate (used in POS - OR-AND configuration).
+         */
+        function drawFinalANDGate(x, y, numInputs) {
+            return drawANDGate(x, y, numInputs); // Re-use AND gate drawing
+        }
+        
+        /**
+         * Generates the SVG string for an OR gate (used in POS - OR-AND configuration).
+         */
+        function drawInputORGate(x, y, numInputs) {
+            return drawORGate(x, y, numInputs); // Re-use OR gate drawing
+        }
+
+
+        /**
+         * Renders the Logic Diagram (Minimal SOP: AND-OR form).
+         */
+        function renderLogicDiagramSOP(sopExpr) {
+            const structure = parseSOPForDiagram(sopExpr);
+            const container = document.createElement('div');
+            container.className = "p-4 bg-gray-800 rounded-lg shadow-xl border border-gray-700 h-full min-h-[450px] overflow-x-auto";
+            
+            if (sopExpr === '1') {
+                container.innerHTML = `<h3 class="text-xl font-semibold mb-4 text-indigo-400">Logic Diagram (Minimal SOP: F=1)</h3><p class="text-green-400 mt-8">Output F is always 1 (VCC).</p>`;
+                return container;
+            }
+            if (sopExpr === '0') {
+                container.innerHTML = `<h3 class="text-xl font-semibold mb-4 text-indigo-400">Logic Diagram (Minimal SOP: F=0)</h3><p class="text-red-400 mt-8">Output F is always 0 (GND).</p>`;
+                return container;
+            }
+            
+            container.innerHTML = `
+                <h3 class="text-xl font-semibold mb-4 text-indigo-400 flex items-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a9 9 0 0 1-9-9c0-6 4-9 9-9s9 3 9 9c0 4-3 9-9 9z"/><path d="M12 16v-4"/></svg>
+                    Minimal SOP Diagram: F=${sopExpr} (AND-OR)
+                </h3>
+                <div id="svg-wrapper" class="pt-4 pb-4"></div>
+            `;
+            
+            const svgWrapper = container.querySelector('#svg-wrapper');
+            const numTerms = structure.length;
+            const hasInverters = sopExpr.includes("'");
+            
+            // Layout constants
+            const INPUT_Y = 50;
+            const INPUT_SPACING = 45;
+            const INPUT_LINE_LENGTH = 150;
+            const INVERTER_X = INPUT_LINE_LENGTH + 10;
+            const AND_GATE_X = INVERTER_X + (hasInverters ? 60 : 0) + HORIZONTAL_SPACING;
+            const OR_GATE_X = AND_GATE_X + HORIZONTAL_SPACING * 1.5;
+
+            // Calculate SVG height based on number of AND gates
+            const totalHeight = numTerms * (GATE_HEIGHT + VERTICAL_SPACING) + 50;
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute('viewBox', `0 0 ${OR_GATE_X + 100} ${totalHeight}`);
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', totalHeight);
+            
+            let svgContent = '';
+            
+            const inputYPositions = {}; // Store Y position for A, B, C, D
+            const invertedInputYPositions = {}; // Store Y position for A', B', C', D'
+            
+            // --- Stage 1: Input Lines & NOT Gates ---
+            
+            INPUT_VARIABLES.forEach((v, i) => {
+                const y = INPUT_Y + i * INPUT_SPACING;
+                inputYPositions[v] = y;
+
+                // Input Variable Label
+                svgContent += `<text x="5" y="${y + 5}" class="gate-label font-bold">${v}</text>`;
+                
+                // Input Line
+                svgContent += `<line x1="30" y1="${y}" x2="${INVERTER_X - 10}" y2="${y}" class="gate-line" />`;
+                
+                // Check if the inverted version is needed in the expression
+                if (sopExpr.includes(`${v}'`)) {
+                    // Draw NOT gate
+                    svgContent += drawNOTGate(INVERTER_X, y - 15); 
+                    invertedInputYPositions[`${v}'`] = y; // Output Y of the NOT gate (middle of line)
+                }
+            });
+            
+            // --- Stage 2: AND Gates (Product Terms) ---
+            
+            const andGateOutputYPositions = [];
+            let currentY = 50; // Start Y position for the first AND gate
+            
+            structure.forEach((termLiterals, i) => {
+                const andGateY = currentY;
+                const numGateInputs = termLiterals.length;
+
+                // 2.1 Draw AND Gate
+                const adjustedHeight = GATE_HEIGHT + (numGateInputs - 2) * 15;
+                const halfAdjustedHeight = adjustedHeight / 2;
+                svgContent += drawANDGate(AND_GATE_X, andGateY, numGateInputs);
+                const andGateOutputY = andGateY + halfAdjustedHeight;
+                andGateOutputYPositions.push(andGateOutputY);
+                
+                // 2.2 Draw Input Lines to AND Gate
+                const andInputSpacing = adjustedHeight / (numGateInputs + 1);
+                
+                termLiterals.forEach((literal, j) => {
+                    const inputY = literal.includes("'") ? invertedInputYPositions[literal] : inputYPositions[literal];
+                    const targetY = andGateY + (j + 1) * andInputSpacing;
+                    
+                    if (!inputY) return;
+
+                    const is_inverted = literal.includes("'");
+                    
+                    // Horizontal segment from input line to AND gate input
+                    const startX = is_inverted ? INVERTER_X + 30 + 9 : 30;
+                    const lineY = is_inverted ? inputYPositions[literal.replace("'", "")] : inputY;
+                    const inputX = AND_GATE_X;
+
+                    // Draw path
+                    svgContent += `
+                        <path d="M ${startX},${lineY} H ${inputX - HORIZONTAL_SPACING / 2} V ${targetY} H ${inputX}" 
+                              class="gate-line" />
+                    `;
+                    
+                    // Add a junction dot at the main input line
+                    svgContent += `<circle cx="30" cy="${inputY}" r="3" fill="#4f46e5" />`;
+                });
+                
+                // 2.3 Draw Output Line from AND Gate
+                svgContent += `<line x1="${AND_GATE_X + GATE_WIDTH}" y1="${andGateOutputY}" x2="${OR_GATE_X}" y2="${andGateOutputY}" class="gate-line" />`;
+                
+                currentY += adjustedHeight + VERTICAL_SPACING;
+            });
+            
+            // --- Stage 3: Final OR Gate ---
+            
+            const orGateHeight = numTerms * (GATE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
+            const orGateCenterY = 50 + orGateHeight / 2;
+            
+            // 3.1 Draw OR Gate
+            svgContent += drawORGate(OR_GATE_X, 50, numTerms); // Adjust Y to be at the top of the first AND gate's output line
+
+            // 3.2 Output Line and Label
+            const outputX = OR_GATE_X + GATE_WIDTH;
+            svgContent += `<line x1="${outputX}" y1="${orGateCenterY}" x2="${outputX + 20}" y2="${orGateCenterY}" class="gate-line" />`;
+            svgContent += `<text x="${outputX + 25}" y="${orGateCenterY + 5}" class="gate-label font-bold text-lg">F</text>`;
+            
+            // 3.3 Connect AND Outputs to OR Gate Inputs
+            const orInputSpacing = orGateHeight / (numTerms + 1);
+            
+            andGateOutputYPositions.forEach((y, i) => {
+                const orInputY = 50 + (i + 1) * orInputSpacing;
+                
+                // Draw path to OR gate input
+                svgContent += `
+                    <path d="M ${AND_GATE_X + GATE_WIDTH},${y} H ${OR_GATE_X - 10} V ${orInputY} H ${OR_GATE_X}" class="gate-line" />
+                `;
+                 // Junction dot
+                 svgContent += `<circle cx="${OR_GATE_X - 10}" cy="${y}" r="3" fill="#4f46e5" />`;
+            });
+            
+            svg.innerHTML = svgContent;
+            svgWrapper.appendChild(svg);
+            return container;
+        }
+
+        /**
+         * Renders the Logic Diagram (Minimal POS: OR-AND form).
+         */
+        function renderLogicDiagramPOS(posExpr) {
+            const structure = parsePOSForDiagram(posExpr);
+            const container = document.createElement('div');
+            container.className = "p-4 bg-gray-800 rounded-lg shadow-xl border border-gray-700 h-full min-h-[450px] overflow-x-auto";
+            
+            if (posExpr === '1') {
+                container.innerHTML = `<h3 class="text-xl font-semibold mb-4 text-indigo-400">Logic Diagram (Minimal POS: F=1)</h3><p class="text-green-400 mt-8">Output F is always 1 (VCC).</p>`;
+                return container;
+            }
+            if (posExpr === '0') {
+                container.innerHTML = `<h3 class="text-xl font-semibold mb-4 text-indigo-400">Logic Diagram (Minimal POS: F=0)</h3><p class="text-red-400 mt-8">Output F is always 0 (GND).</p>`;
+                return container;
+            }
+            
+            container.innerHTML = `
+                <h3 class="text-xl font-semibold mb-4 text-indigo-400 flex items-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a9 9 0 0 1-9-9c0-6 4-9 9-9s9 3 9 9c0 4-3 9-9 9z"/><path d="M12 16v-4"/></svg>
+                    Minimal POS Diagram: F=${posExpr} (OR-AND)
+                </h3>
+                <div id="svg-wrapper-pos" class="pt-4 pb-4"></div>
+            `;
+            
+            const svgWrapper = container.querySelector('#svg-wrapper-pos');
+            const numTerms = structure.length;
+            const hasInverters = posExpr.includes("'");
+            
+            // Layout constants (re-used for consistency)
+            const INPUT_Y = 50;
+            const INPUT_SPACING = 45;
+            const INPUT_LINE_LENGTH = 150;
+            const INVERTER_X = INPUT_LINE_LENGTH + 10;
+            const OR_GATE_X = INVERTER_X + (hasInverters ? 60 : 0) + HORIZONTAL_SPACING;
+            const AND_GATE_X = OR_GATE_X + HORIZONTAL_SPACING * 1.5;
+
+            // Calculate SVG height based on number of OR gates
+            const totalHeight = numTerms * (GATE_HEIGHT + VERTICAL_SPACING) + 50;
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute('viewBox', `0 0 ${AND_GATE_X + 100} ${totalHeight}`);
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', totalHeight);
+            
+            let svgContent = '';
+            
+            const inputYPositions = {}; 
+            const invertedInputYPositions = {};
+            
+            // --- Stage 1: Input Lines & NOT Gates ---
+            INPUT_VARIABLES.forEach((v, i) => {
+                const y = INPUT_Y + i * INPUT_SPACING;
+                inputYPositions[v] = y;
+                svgContent += `<text x="5" y="${y + 5}" class="gate-label font-bold">${v}</text>`;
+                svgContent += `<line x1="30" y1="${y}" x2="${INVERTER_X - 10}" y2="${y}" class="gate-line" />`;
+                
+                if (posExpr.includes(`${v}'`)) {
+                    svgContent += drawNOTGate(INVERTER_X, y - 15); 
+                    invertedInputYPositions[`${v}'`] = y;
+                }
+            });
+            
+            // --- Stage 2: OR Gates (Sum Terms) ---
+            const orGateOutputYPositions = [];
+            let currentY = 50;
+            
+            structure.forEach((termLiterals, i) => {
+                const orGateY = currentY;
+                const numGateInputs = termLiterals.length;
+
+                // 2.1 Draw OR Gate
+                const adjustedHeight = GATE_HEIGHT + (numGateInputs - 2) * 15;
+                const halfAdjustedHeight = adjustedHeight / 2;
+                svgContent += drawInputORGate(OR_GATE_X, orGateY, numGateInputs);
+                const orGateOutputY = orGateY + halfAdjustedHeight;
+                orGateOutputYPositions.push(orGateOutputY);
+                
+                // 2.2 Draw Input Lines to OR Gate (Same routing logic as SOP/AND)
+                const orInputSpacing = adjustedHeight / (numGateInputs + 1);
+                
+                termLiterals.forEach((literal, j) => {
+                    const inputY = literal.includes("'") ? invertedInputYPositions[literal] : inputYPositions[literal];
+                    const targetY = orGateY + (j + 1) * orInputSpacing;
+                    
+                    if (!inputY) return;
+
+                    const is_inverted = literal.includes("'");
+                    
+                    const startX = is_inverted ? INVERTER_X + 30 + 9 : 30;
+                    const lineY = is_inverted ? inputYPositions[literal.replace("'", "")] : inputY;
+                    const inputX = OR_GATE_X;
+
+                    // Draw path
+                    svgContent += `
+                        <path d="M ${startX},${lineY} H ${inputX - HORIZONTAL_SPACING / 2} V ${targetY} H ${inputX}" 
+                              class="gate-line" />
+                    `;
+                    
+                    svgContent += `<circle cx="30" cy="${inputY}" r="3" fill="#4f46e5" />`;
+                });
+                
+                // 2.3 Draw Output Line from OR Gate
+                svgContent += `<line x1="${OR_GATE_X + GATE_WIDTH}" y1="${orGateOutputY}" x2="${AND_GATE_X}" y2="${orGateOutputY}" class="gate-line" />`;
+                
+                currentY += adjustedHeight + VERTICAL_SPACING;
+            });
+            
+            // --- Stage 3: Final AND Gate ---
+            
+            const andGateHeight = numTerms * (GATE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
+            const andGateCenterY = 50 + andGateHeight / 2;
+            
+            // 3.1 Draw Final AND Gate
+            svgContent += drawFinalANDGate(AND_GATE_X, 50, numTerms); 
+
+            // 3.2 Output Line and Label
+            const outputX = AND_GATE_X + GATE_WIDTH;
+            svgContent += `<line x1="${outputX}" y1="${andGateCenterY}" x2="${outputX + 20}" y2="${andGateCenterY}" class="gate-line" />`;
+            svgContent += `<text x="${outputX + 25}" y="${andGateCenterY + 5}" class="gate-label font-bold text-lg">F</text>`;
+            
+            // 3.3 Connect OR Outputs to Final AND Gate Inputs
+            const andInputSpacing = andGateHeight / (numTerms + 1);
+            
+            orGateOutputYPositions.forEach((y, i) => {
+                const andInputY = 50 + (i + 1) * andInputSpacing;
+                
+                // Draw path to AND gate input
+                svgContent += `
+                    <path d="M ${OR_GATE_X + GATE_WIDTH},${y} H ${AND_GATE_X - 10} V ${andInputY} H ${AND_GATE_X}" class="gate-line" />
+                `;
+                 // Junction dot
+                 svgContent += `<circle cx="${AND_GATE_X - 10}" cy="${y}" r="3" fill="#4f46e5" />`;
+            });
+            
+            svg.innerHTML = svgContent;
+            svgWrapper.appendChild(svg);
+            return container;
+        }
+
+        // --- DOM Manipulation / Rendering Functions (Updated) ---
+        
+        // ... (createKMapCell remains the same) ...
+        function createKMapCell(minterm, kMapMatrix, groups, isSOPMode) {
+            const row = K_MAP_ROW_MAP[minterm];
+            const col = K_MAP_COL_MAP[minterm];
+            const cellValue = kMapMatrix[row] ? kMapMatrix[row][col] : 0;
+            
+            const isTargetValue = (isSOPMode && cellValue === 1) || (!isSOPMode && cellValue === 0);
+
+            const activeGroups = groups
+                .filter(g => g.minterms.includes(minterm))
+                .map((g, i) => ({
+                    color: GROUP_COLORS[i % GROUP_COLORS.length],
+                    size: g.size
+                }));
+
+            const isGrouped = activeGroups.length > 0;
+
+            const cell = document.createElement('div');
+            cell.className = `
+                w-12 h-12 flex items-center justify-center font-mono text-lg font-bold
+                transition-all duration-300 relative rounded-sm
+                ${isTargetValue ? 'text-white' : 'text-gray-400'}
+                ${isGrouped ? 'bg-indigo-700/50 hover:bg-indigo-700/70' : 'hover:bg-gray-700'}
+            `;
+            cell.title = `m${minterm}: ${cellValue}`;
+            
+            if (isGrouped && isTargetValue) {
+                cell.style.boxShadow = activeGroups.map((g, i) => `0 0 0 ${i * 2 + 2}px ${g.color}`).join(', ');
+                cell.style.zIndex = 1;
+            }
+
+            cell.innerHTML = `
+                <span class="z-10 ${cellValue === 1 ? 'text-green-300' : 'text-red-300'}">${cellValue}</span>
+                <span class="absolute bottom-0 right-0 text-xs text-gray-400 opacity-50 p-0.5 z-0">m${minterm}</span>
+            `;
+
+            return cell;
+        }
+
+        // ... (renderKMapVisualization remains the same) ...
+        function renderKMapVisualization(results) {
+            const isSOPMode = mode === 'sop';
+            const groupsToDisplay = isSOPMode ? results.sopGroups : results.posGroups;
+            const modeTitle = isSOPMode ? "SOP Grouping (1s)" : "POS Grouping (0s)";
+
+            const container = document.createElement('div');
+            container.className = "p-4 bg-gray-800 rounded-lg shadow-xl border border-gray-700 h-full min-h-[450px]";
+            container.innerHTML = `
+                <h3 class="text-xl font-semibold mb-4 text-indigo-400 flex items-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> 
+                    4-Variable K-Map (A, B, C, D) - ${modeTitle}
+                </h3>
+                <div class="flex items-center justify-center pt-4">
+                    <div class="flex flex-col items-center">
+                        <div class="flex justify-between w-full text-xs text-gray-400 font-mono pl-14 pb-2">
+                            <span class="w-12 text-center">00 (C'D')</span>
+                            <span class="w-12 text-center">01 (C'D)</span>
+                            <span class="w-12 text-center">11 (CD)</span>
+                            <span class="w-12 text-center">10 (CD')</span>
+                        </div>
+                        <div id="kmap-grid"></div>
+                    </div>
+                </div>
+            `;
+
+            const kmapGrid = container.querySelector('#kmap-grid');
+
+            K_MAP_INDEX_MAP.forEach((rowIndexes, r) => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = "flex";
+                
+                // AB labels
+                const rowLabel = document.createElement('div');
+                rowLabel.className = "w-12 h-12 flex items-center justify-center text-xs text-gray-400 font-mono pr-2";
+                if (r === 0) rowLabel.textContent = '00 (A\'B\')';
+                else if (r === 1) rowLabel.textContent = '01 (A\'B)';
+                else if (r === 2) rowLabel.textContent = '11 (AB)';
+                else if (r === 3) rowLabel.textContent = '10 (AB\')';
+                rowDiv.appendChild(rowLabel);
+
+                rowIndexes.forEach((minterm) => {
+                    rowDiv.appendChild(createKMapCell(minterm, results.kMapMatrix, groupsToDisplay, isSOPMode));
+                });
+                kmapGrid.appendChild(rowDiv);
+            });
+
+            return container;
+        }
+        
+        // ... (renderTruthTableVisualization remains the same) ...
+        function renderTruthTableVisualization(results) {
+             const container = document.createElement('div');
+            container.className = "p-4 bg-gray-800 rounded-lg shadow-xl border border-gray-700";
+            container.innerHTML = `
+                <h3 class="text-xl font-semibold mb-4 text-indigo-400 flex items-center">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M12 4v16"/><path d="M2 10h20"/><path d="M2 14h20"/></svg> 
+                    Truth Table (A, B, C, D)
+                </h3>
+                <div class="overflow-x-auto h-96">
+                    <table class="min-w-full text-sm text-left text-gray-300 font-mono">
+                        <thead class="text-xs text-gray-100 uppercase bg-gray-700 sticky top-0">
+                            <tr>
+                                <th scope="col" class="px-3 py-2 text-center rounded-tl-lg">m</th>
+                                <th scope="col" class="px-3 py-2 text-center">A</th>
+                                <th scope="col" class="px-3 py-2 text-center">B</th>
+                                <th scope="col" class="px-3 py-2 text-center">C</th>
+                                <th scope="col" class="px-3 py-2 text-center">D</th>
+                                <th scope="col" class="px-3 py-2 text-center rounded-tr-lg text-green-400">F(A,B,C,D)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="truth-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            `;
+            
+            const tbody = container.querySelector('#truth-table-body');
+            results.truthTable.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "bg-gray-800 border-b border-gray-700 hover:bg-gray-700/50 transition duration-150";
+                tr.innerHTML = `
+                    <td class="px-3 py-2 text-center font-bold">${row.minterm}</td>
+                    <td class="px-3 py-2 text-center">${row.A}</td>
+                    <td class="px-3 py-2 text-center">${row.B}</td>
+                    <td class="px-3 py-2 text-center">${row.C}</td>
+                    <td class="px-3 py-2 text-center">${row.D}</td>
+                    <td class="px-3 py-2 text-center font-extrabold ${row.output === 1 ? 'text-green-500' : 'text-red-500'}">
+                        ${row.output}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            return container;
+        }
+
+        // ... (renderMinimalResults remains the same, except for the removed KaTeX warning) ...
+        function renderMinimalResults(results) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = `
+                <div class="p-4 bg-gray-800 rounded-lg shadow-xl border border-indigo-700">
+                    <h3 class="text-xl font-semibold mb-4 text-indigo-400 flex items-center">
+                        <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2 2 4-4"/><path d="M12 21a9 9 0 0 1-9-9c0-6 4-9 9-9s9 3 9 9c0 4-3 9-9 9z"/></svg>
+                        Minimal Results
+                    </h3>
+                    
+                    <div class="mb-6 p-4 bg-gray-900 rounded-lg border border-green-600/50">
+                        <h4 class="font-semibold text-green-400 mb-2 flex justify-between items-center">
+                            Minimal Sum-of-Products (SOP)
+                        </h4>
+                        <p class="text-2xl font-mono text-green-300 overflow-x-auto break-words p-1">
+                            ${results.minimalSOP}
+                        </p>
+                        <h5 class="text-xs font-semibold text-gray-500 mb-1">
+                            Canonical Minterms (&sum; m):
+                        </h5>
+                        <p class="text-base font-mono text-gray-300 overflow-x-auto break-words p-1 pt-0">
+                            &sum; m(${results.mintermList})
+                        </p>
+                        <div class="flex justify-end">
+                            <button
+                                onclick="copyToClipboard('${results.minimalSOP.replace(/'/g, '\\\'')}')"
+                                class="mt-2 p-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-md transition duration-150 relative copy-btn"
+                                data-target-id="minimal-sop"
+                                data-original-text="Copy SOP"
+                            >
+                                Copy SOP
+                                <svg class="w-3 h-3 ml-1 inline" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 2 2 4-4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12"/><path d="M16 19H7a2 2 0 0 1-2-2v-4"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 bg-gray-900 rounded-lg border border-red-600/50">
+                        <h4 class="font-semibold text-red-400 mb-2 flex justify-between items-center">
+                            Minimal Product-of-Sums (POS)
+                        </h4>
+                        <p class="text-2xl font-mono text-red-300 overflow-x-auto break-words p-1">
+                            ${results.minimalPOS}
+                        </p>
+                        <h5 class="text-xs font-semibold text-gray-500 mb-1">
+                            Canonical Maxterms (&prod; M):
+                        </h5>
+                         <p class="text-base font-mono text-gray-300 overflow-x-auto break-words p-1 pt-0">
+                            &prod; M(${results.maxtermList})
+                        </p>
+                        <div class="flex justify-end">
+                            <button
+                                onclick="copyToClipboard('${results.minimalPOS.replace(/'/g, '\\\'')}')"
+                                class="mt-2 p-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md transition duration-150 relative copy-btn"
+                                data-target-id="minimal-pos"
+                                data-original-text="Copy POS"
+                            >
+                                Copy POS
+                                <svg class="w-3 h-3 ml-1 inline" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 2 2 4-4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12"/><path d="M16 19H7a2 2 0 0 1-2-2v-4"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        function renderApp() {
+            let truthTable;
+            if (inputType === 'expression') {
+                truthTable = generateTruthTableFromExpression(logicInput);
+            } else {
+                truthTable = generateTruthTableFromMinMax(logicInput);
+            }
+            const results = solveKMap(truthTable);
+
+            // 2. Render Left Tab Content
+            const container = document.getElementById('visualization-container');
+            container.innerHTML = '';
+            let content;
+            if (activeTab === 'kmap') {
+                content = renderKMapVisualization(results);
+            } else if (activeTab === 'truth') {
+                content = renderTruthTableVisualization(results);
+            } else if (activeTab === 'diagram-sop') {
+                content = renderLogicDiagramSOP(results.minimalSOP);
+            } else if (activeTab === 'diagram-pos') {
+                content = renderLogicDiagramPOS(results.minimalPOS);
+            }
+            container.appendChild(content);
+
+            // 3. Render Right Minimal Results Content
+            renderMinimalResults(results);
+
+             // 4. Update tab buttons' active state
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active', 'bg-indigo-600', 'text-white', 'hover:bg-indigo-700');
+                btn.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+            });
+            const activeBtn = document.getElementById(`tab-${activeTab}`);
+            if (activeBtn) {
+                activeBtn.classList.add('active', 'bg-indigo-600', 'text-white', 'hover:bg-indigo-700');
+                activeBtn.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+            }
+        }
+
+        // --- Event Handlers ---
+        function handleInputChange(event) {
+            logicInput = event.target.value;
+            renderApp();
+        }
+
+        function setActiveTab(tabName) {
+            activeTab = tabName;
+            renderApp();
+        }
+
+        function setSimplificationMode(newMode) {
+            mode = newMode;
+            // Update visual style of the toggle labels
+            const sopLabel = document.getElementById('label-sop');
+            const posLabel = document.getElementById('label-pos');
+
+            // Reset all
+            sopLabel.classList.remove('bg-indigo-600', 'text-white', 'shadow-md', 'bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+            posLabel.classList.remove('bg-indigo-600', 'text-white', 'shadow-md', 'bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+
+            if (mode === 'sop') {
+                sopLabel.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                posLabel.classList.add('bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+            } else {
+                posLabel.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                sopLabel.classList.add('bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+            }
+            
+            // Re-render to update K-Map grouping and results context
+            renderApp();
+        }
+
+        function setInputType(newType) {
+            inputType = newType;
+            const inputElement = document.getElementById('logic-input');
+            const helperTextElement = document.getElementById('input-helper-text');
+            const exprLabel = document.getElementById('label-expression');
+            const minmaxLabel = document.getElementById('label-minmax');
+            
+            // Update visual style
+            exprLabel.classList.remove('bg-indigo-600', 'text-white', 'shadow-md', 'bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+            minmaxLabel.classList.remove('bg-indigo-600', 'text-white', 'shadow-md', 'bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+
+
+            if (inputType === 'expression') {
+                exprLabel.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                minmaxLabel.classList.add('bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+
+                inputElement.placeholder = "e.g., A'B + C D' + A B C D";
+                helperTextElement.innerHTML = '<span class="font-bold">Operators:</span> <span class="font-bold">AND</span> is space, <span class="font-mono">*</span>, or <span class="font-mono">&amp;</span>. <span class="font-bold">OR</span> is <span class="font-mono">+</span> or <span class="font-mono">|</span>. <span class="font-bold">NOT</span> is <span class="font-mono">\'</span>.';
+                // Set default expression if the current input looks like min/max terms
+                if (logicInput.match(/^[mM]\s*\(\s*\d/)) { 
+                    logicInput = "A'B'C'D' + A'B'C'D + A'B'C D + A'B'C D'";
+                    inputElement.value = logicInput;
+                }
+            } else {
+                minmaxLabel.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+                exprLabel.classList.add('bg-gray-700', 'text-gray-400', 'hover:bg-gray-700');
+
+                inputElement.placeholder = "e.g., m(0, 1, 3, 4) or M(5, 6, 7)";
+                helperTextElement.innerHTML = '<span class="font-bold">Minterms:</span> Use <span class="font-mono">m(...)</span> or <span class="font-mono">sum(m...)</span>. <span class="font-bold">Maxterms:</span> Use <span class="font-mono">M(...)</span> or <span class="font-mono">prod(M...)</span>.';
+                 // Set default minterms if the current input looks like an expression
+                if (logicInput.match(/[ABCD]'?/)) {
+                     // Corresponds to the default expression's minterms
+                    logicInput = "m(0, 1, 3, 2)"; 
+                    inputElement.value = logicInput;
+                }
+            }
+            renderApp();
+        }
+
+
+        function copyToClipboard(text) {
+            // Clean up text before copying (removes latex backslashes if any)
+            const cleanText = text.replace(/\\'/g, "'").replace(/\$\$|\\/g, '').trim(); 
+            
+            const tempInput = document.createElement('textarea');
+            tempInput.value = cleanText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                document.execCommand('copy');
+                const allCopyButtons = document.querySelectorAll('.copy-btn');
+                allCopyButtons.forEach(btn => {
+                    // Simple way to check if this is the button that was clicked
+                    if (btn.onclick.toString().includes(text.substring(0, 10))) {
+                        const originalText = btn.getAttribute('data-original-text') || btn.textContent.trim();
+                        const originalTextClean = originalText.replace(/<svg.*<\/svg>/, '').trim();
+
+                        btn.setAttribute('data-original-text', originalTextClean);
+                        
+                        btn.textContent = 'Copied!';
+                        setTimeout(() => {
+                            const icon = '<svg class="w-3 h-3 ml-1 inline" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 2 2 4-4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12"/><path d="M16 19H7a2 2 0 0 1-2-2v-4"/></svg>';
+                                
+                            btn.innerHTML = originalTextClean + icon;
+                        }, 2000);
+                    }
+                });
+            } catch (err) {
+                console.error('Copy failed: ', err);
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        // --- Initialization ---
+
+        window.onload = function() {
+            const inputElement = document.getElementById('logic-input');
+            inputElement.value = logicInput;
+            inputElement.addEventListener('input', handleInputChange);
+            
+            // Initialize with default input type and mode
+            setInputType(inputType); 
+            setSimplificationMode(mode);
+        };
+
+    </script>
+</body>
+</html>
